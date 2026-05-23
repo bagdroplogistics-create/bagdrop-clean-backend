@@ -1,4 +1,4 @@
-```python id="rb6x8w"
+
 from fastapi import FastAPI
 
 app = FastAPI()
@@ -9,4 +9,4 @@ async def root():
         "message": "Bagdrop API",
         "status": "ok"
     }
-```
+
