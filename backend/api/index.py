@@ -262,6 +262,13 @@ async def root():
         "status": "ok"
     }
 
+@api_router.get("/test")
+async def test():
+    return {
+        "working": True
+    }
+
+
 
 @api_router.post("/bookings", response_model=Booking)
 async def create_booking(
