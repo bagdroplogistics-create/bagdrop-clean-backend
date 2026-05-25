@@ -140,19 +140,14 @@ def _format_booking_email(b: dict) -> str:
 # =========================
 # Send Email
 # =========================
-def send_booking_email(b: dict) -> None:
-    logger.info("Starting email send process...")
 
-    logger.info(f"SMTP_HOST: {SMTP_HOST}")
-    logger.info(f"SMTP_PORT: {SMTP_PORT}")
-    logger.info(f"SMTP_USER: {SMTP_USER}")
-    logger.info(f"ADMIN_EMAIL: {ADMIN_EMAIL}")
+# =========================
+# Send Email
+# =========================
+def send_booking_email(b: dict) -> None:
 
     if not (SMTP_HOST and SMTP_USER and SMTP_PASS):
-        logger.info(
-            "SMTP not configured - skipping email for booking %s",
-            b.get("code")
-        )
+        logger.info("SMTP not configured")
         return
 
     try:
@@ -165,290 +160,262 @@ def send_booking_email(b: dict) -> None:
         )
 
         msg["From"] = SMTP_FROM
-
-        # TEMP direct hardcoded test
-        msg["To"] = "info@bagdrop.co"
+        msg["To"] = ADMIN_EMAIL
 
         if b.get("email"):
             msg["Cc"] = b["email"]
-            
-html_content = f"""
-<html>
-<head>
-<style>
-body {{
-    font-family: Arial, sans-serif;
-    background-color: #f3f3f3;
-    margin: 0;
-    padding: 20px;
-}}
 
-.container {{
-    max-width: 700px;
-    margin: auto;
-    background: #ffffff;
-    border-radius: 10px;
-    overflow: hidden;
-    border: 1px solid #e5e5e5;
-}}
+        # =========================
+        # HTML EMAIL TEMPLATE
+        # =========================
+        html_content = f"""
+        <html>
+        <head>
+        <style>
+        body {{
+            font-family: Arial, sans-serif;
+            background-color: #f3f3f3;
+            margin: 0;
+            padding: 20px;
+        }}
 
-.header {{
-    background: #ff6b35;
-    color: white;
-    text-align: center;
-    padding: 30px 20px;
-}}
+        .container {{
+            max-width: 700px;
+            margin: auto;
+            background: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #e5e5e5;
+        }}
 
-.header h1 {{
-    margin: 0;
-    font-size: 34px;
-    letter-spacing: 1px;
-}}
+        .header {{
+            background: #ff6b35;
+            color: white;
+            text-align: center;
+            padding: 30px 20px;
+        }}
 
-.header p {{
-    margin-top: 8px;
-    font-size: 13px;
-    opacity: 0.95;
-}}
+        .header h1 {{
+            margin: 0;
+            font-size: 34px;
+            letter-spacing: 1px;
+        }}
 
-.content {{
-    padding: 30px;
-}}
+        .header p {{
+            margin-top: 8px;
+            font-size: 13px;
+            opacity: 0.95;
+        }}
 
-.title {{
-    color: #ff6b35;
-    font-size: 24px;
-    font-weight: bold;
-    margin-bottom: 10px;
-}}
+        .content {{
+            padding: 30px;
+        }}
 
-.subtitle {{
-    color: #555;
-    margin-bottom: 25px;
-    line-height: 1.6;
-}}
+        .title {{
+            color: #ff6b35;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }}
 
-.card {{
-    border: 1px solid #eee;
-    border-left: 4px solid #ff6b35;
-    padding: 20px;
-    margin-bottom: 25px;
-    background: #fafafa;
-}}
+        .subtitle {{
+            color: #555;
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }}
 
-.card h3 {{
-    margin-top: 0;
-    color: #ff6b35;
-}}
+        .card {{
+            border: 1px solid #eee;
+            border-left: 4px solid #ff6b35;
+            padding: 20px;
+            margin-bottom: 25px;
+            background: #fafafa;
+        }}
 
-.row {{
-    margin-bottom: 12px;
-}}
+        .card h3 {{
+            margin-top: 0;
+            color: #ff6b35;
+        }}
 
-.label {{
-    font-weight: bold;
-    width: 150px;
-    display: inline-block;
-    color: #222;
-}}
+        .row {{
+            margin-bottom: 12px;
+        }}
 
-.value {{
-    color: #444;
-}}
+        .label {{
+            font-weight: bold;
+            width: 150px;
+            display: inline-block;
+            color: #222;
+        }}
 
-.footer {{
-    background: #fafafa;
-    padding: 25px;
-    font-size: 13px;
-    color: #666;
-    text-align: center;
-    border-top: 1px solid #eee;
-}}
+        .value {{
+            color: #444;
+        }}
 
-.badge {{
-    display: inline-block;
-    background: #16a34a;
-    color: white;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 13px;
-    margin-top: 15px;
-}}
-</style>
-</head>
+        .footer {{
+            background: #fafafa;
+            padding: 25px;
+            font-size: 13px;
+            color: #666;
+            text-align: center;
+            border-top: 1px solid #eee;
+        }}
 
-<body>
+        .badge {{
+            display: inline-block;
+            background: #16a34a;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            margin-top: 15px;
+        }}
+        </style>
+        </head>
 
-<div class="container">
+        <body>
 
-    <div class="header">
-        <h1>BAGDROP</h1>
-        <p>BAG BOX DELIVERED</p>
+        <div class="container">
 
-        <div class="badge">
-            {b.get('status')}
+            <div class="header">
+                <h1>BAGDROP</h1>
+                <p>BAG BOX DELIVERED</p>
+
+                <div class="badge">
+                    {b.get('status')}
+                </div>
+            </div>
+
+            <div class="content">
+
+                <div class="title">
+                    Booking Received! ✓
+                </div>
+
+                <div class="subtitle">
+                    Dear {b.get('name')},<br><br>
+
+                    Thank you for choosing Bagdrop. Your booking request has been received successfully.
+                    Our operations team will contact you shortly for confirmation and baggage pickup coordination.
+                </div>
+
+                <div class="card">
+                    <h3>Booking Reference</h3>
+
+                    <div style="font-size:28px;font-weight:bold;color:#222;">
+                        {b.get('code')}
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Delivery Details</h3>
+
+                    <div class="row">
+                        <span class="label">Service Type:</span>
+                        <span class="value">{b.get('service_title')}</span>
+                    </div>
+
+                    <div class="row">
+                        <span class="label">Pickup Location:</span>
+                        <span class="value">{b.get('from_label')}</span>
+                    </div>
+
+                    <div class="row">
+                        <span class="label">Pickup Address:</span>
+                        <span class="value">{b.get('pickup_address')}</span>
+                    </div>
+
+                    <div class="row">
+                        <span class="label">Drop Location:</span>
+                        <span class="value">{b.get('to_label')}</span>
+                    </div>
+
+                    <div class="row">
+                        <span class="label">Drop Address:</span>
+                        <span class="value">{b.get('drop_address')}</span>
+                    </div>
+
+                    <div class="row">
+                        <span class="label">Pickup Date:</span>
+                        <span class="value">{b.get('date')}</span>
+                    </div>
+
+                    <div class="row">
+                        <span class="label">Time Slot:</span>
+                        <span class="value">{b.get('time_slot')}</span>
+                    </div>
+
+                    <div class="row">
+                        <span class="label">Number of Bags:</span>
+                        <span class="value">{b.get('total_bags')}</span>
+                    </div>
+
+                    <div class="row">
+                        <span class="label">Total Price:</span>
+                        <span class="value">₹{b.get('total_price')}</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Customer Information</h3>
+
+                    <div class="row">
+                        <span class="label">Customer Name:</span>
+                        <span class="value">{b.get('name')}</span>
+                    </div>
+
+                    <div class="row">
+                        <span class="label">Phone Number:</span>
+                        <span class="value">{b.get('phone')}</span>
+                    </div>
+
+                    <div class="row">
+                        <span class="label">Email Address:</span>
+                        <span class="value">{b.get('email')}</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="footer">
+                <strong>Need Assistance?</strong><br><br>
+
+                📞 +91 9876543210<br>
+                ✉ info@bagdrop.co<br><br>
+
+                Thank you for choosing Bagdrop.<br>
+                Premium Airport Baggage Delivery Service.
+            </div>
+
         </div>
-    </div>
 
-    <div class="content">
+        </body>
+        </html>
+        """
 
-        <div class="title">
-            Booking Received! ✓
-        </div>
+        # Plain text fallback
+        msg.set_content(_format_booking_email(b))
 
-        <div class="subtitle">
-            Dear {b.get('name')},<br><br>
-
-            Thank you for choosing Bagdrop. Your booking request has been received successfully.
-            Our operations team will contact you shortly for confirmation and baggage pickup coordination.
-        </div>
-
-        <div class="card">
-            <h3>Booking Reference</h3>
-
-            <div style="font-size:28px;font-weight:bold;color:#222;">
-                {b.get('code')}
-            </div>
-        </div>
-
-        <div class="card">
-            <h3>Delivery Details</h3>
-
-            <div class="row">
-                <span class="label">Service Type:</span>
-                <span class="value">{b.get('service_title')}</span>
-            </div>
-
-            <div class="row">
-                <span class="label">Pickup Location:</span>
-                <span class="value">{b.get('from_label')}</span>
-            </div>
-
-            <div class="row">
-                <span class="label">Pickup Address:</span>
-                <span class="value">{b.get('pickup_address')}</span>
-            </div>
-
-            <div class="row">
-                <span class="label">Drop Location:</span>
-                <span class="value">{b.get('to_label')}</span>
-            </div>
-
-            <div class="row">
-                <span class="label">Drop Address:</span>
-                <span class="value">{b.get('drop_address')}</span>
-            </div>
-
-            <div class="row">
-                <span class="label">Pickup Date:</span>
-                <span class="value">{b.get('date')}</span>
-            </div>
-
-            <div class="row">
-                <span class="label">Time Slot:</span>
-                <span class="value">{b.get('time_slot')}</span>
-            </div>
-
-            <div class="row">
-                <span class="label">Number of Bags:</span>
-                <span class="value">{b.get('total_bags')}</span>
-            </div>
-
-            <div class="row">
-                <span class="label">Total Price:</span>
-                <span class="value">₹{b.get('total_price')}</span>
-            </div>
-        </div>
-
-        <div class="card">
-            <h3>Customer Information</h3>
-
-            <div class="row">
-                <span class="label">Customer Name:</span>
-                <span class="value">{b.get('name')}</span>
-            </div>
-
-            <div class="row">
-                <span class="label">Phone Number:</span>
-                <span class="value">{b.get('phone')}</span>
-            </div>
-
-            <div class="row">
-                <span class="label">Email Address:</span>
-                <span class="value">{b.get('email')}</span>
-            </div>
-        </div>
-
-    </div>
-
-    <div class="footer">
-        <strong>Need Assistance?</strong><br><br>
-
-        📞 +91 9876543210<br>
-        ✉ info@bagdrop.co<br><br>
-
-        Thank you for choosing Bagdrop.<br>
-        Premium Airport Baggage Delivery Service.
-    </div>
-
-</div>
-
-</body>
-</html>
-""" 
-
-
-msg.set_content(_format_booking_email(b))
-msg.add_alternative(html_content, subtype="html")
-
-
+        # HTML email
+        msg.add_alternative(html_content, subtype="html")
 
         ctx = ssl.create_default_context()
 
-        logger.info("Connecting to SMTP server...")
+        with smtplib.SMTP(
+            SMTP_HOST,
+            SMTP_PORT,
+            timeout=15
+        ) as s:
 
-        if SMTP_PORT == 465:
-            with smtplib.SMTP_SSL(
-                SMTP_HOST,
-                SMTP_PORT,
-                context=ctx,
-                timeout=15
-            ) as s:
-                logger.info("SMTP SSL connected")
+            s.starttls(context=ctx)
 
-                s.login(SMTP_USER, SMTP_PASS)
+            s.login(SMTP_USER, SMTP_PASS)
 
-                logger.info("SMTP login successful")
-
-                s.send_message(msg)
-
-                logger.info("Email sent successfully")
-
-        else:
-            with smtplib.SMTP(
-                SMTP_HOST,
-                SMTP_PORT,
-                timeout=15
-            ) as s:
-
-                logger.info("SMTP connected")
-
-                s.starttls(context=ctx)
-
-                logger.info("TLS started")
-
-                s.login(SMTP_USER, SMTP_PASS)
-
-                logger.info("SMTP login successful")
-
-                s.send_message(msg)
-
-                logger.info("Email sent successfully")
+            s.send_message(msg)
 
         logger.info(
-            "Sent booking email for %s to %s",
-            b.get("code"),
-            ADMIN_EMAIL
+            "Sent booking email for %s",
+            b.get("code")
         )
 
     except Exception as e:
