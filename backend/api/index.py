@@ -172,7 +172,191 @@ def send_booking_email(b: dict) -> None:
         if b.get("email"):
             msg["Cc"] = b["email"]
 
-        msg.set_content(_format_booking_email(b))
+   
+html_content = f"""
+<html>
+<head>
+  <style>
+    body {{
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      padding: 20px;
+      color: #333333;
+    }}
+
+    .container {{
+      max-width: 700px;
+      margin: auto;
+      background: #ffffff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }}
+
+    .header {{
+      background: #f97316;
+      color: white;
+      padding: 24px;
+      text-align: center;
+    }}
+
+    .header h1 {{
+      margin: 0;
+      font-size: 28px;
+    }}
+
+    .content {{
+      padding: 24px;
+    }}
+
+    .section {{
+      margin-bottom: 24px;
+    }}
+
+    .section h2 {{
+      font-size: 18px;
+      margin-bottom: 12px;
+      color: #f97316;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 6px;
+    }}
+
+    .row {{
+      margin-bottom: 8px;
+    }}
+
+    .label {{
+      font-weight: bold;
+      display: inline-block;
+      width: 140px;
+    }}
+
+    .footer {{
+      background: #fafafa;
+      padding: 20px;
+      text-align: center;
+      font-size: 13px;
+      color: #777;
+    }}
+
+    .badge {{
+      display: inline-block;
+      background: #16a34a;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      margin-top: 10px;
+    }}
+  </style>
+</head>
+
+<body>
+  <div class="container">
+
+    <div class="header">
+      <h1>Bagdrop Booking</h1>
+      <div class="badge">{b.get('status')}</div>
+    </div>
+
+    <div class="content">
+
+      <div class="section">
+        <h2>Booking Information</h2>
+
+        <div class="row">
+          <span class="label">Booking ID:</span>
+          {b.get('code')}
+        </div>
+
+        <div class="row">
+          <span class="label">Service:</span>
+          {b.get('service_title')}
+        </div>
+
+        <div class="row">
+          <span class="label">Pickup Date:</span>
+          {b.get('date')}
+        </div>
+
+        <div class="row">
+          <span class="label">Time Slot:</span>
+          {b.get('time_slot')}
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Customer Details</h2>
+
+        <div class="row">
+          <span class="label">Name:</span>
+          {b.get('name')}
+        </div>
+
+        <div class="row">
+          <span class="label">Phone:</span>
+          {b.get('phone')}
+        </div>
+
+        <div class="row">
+          <span class="label">Email:</span>
+          {b.get('email')}
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Route Details</h2>
+
+        <div class="row">
+          <span class="label">Pickup:</span>
+          {b.get('pickup_address')}
+        </div>
+
+        <div class="row">
+          <span class="label">From:</span>
+          {b.get('from_label')}
+        </div>
+
+        <div class="row">
+          <span class="label">Drop:</span>
+          {b.get('drop_address')}
+        </div>
+
+        <div class="row">
+          <span class="label">To:</span>
+          {b.get('to_label')}
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Pricing</h2>
+
+        <div class="row">
+          <span class="label">Total Bags:</span>
+          {b.get('total_bags')}
+        </div>
+
+        <div class="row">
+          <span class="label">Total Price:</span>
+          ₹{b.get('total_price')}
+        </div>
+      </div>
+
+    </div>
+
+    <div class="footer">
+      © 2026 Bagdrop Logistics — Secure Airport Baggage Delivery
+    </div>
+
+  </div>
+</body>
+</html>
+"""
+
+msg.set_content(_format_booking_email(b))
+msg.add_alternative(html_content, subtype="html")
+
+
 
         ctx = ssl.create_default_context()
 
