@@ -141,6 +141,13 @@ def _format_booking_email(b: dict) -> str:
 # Send Email
 # =========================
 def send_booking_email(b: dict) -> None:
+    logger.info("Starting email send process...")
+
+    logger.info(f"SMTP_HOST: {SMTP_HOST}")
+    logger.info(f"SMTP_PORT: {SMTP_PORT}")
+    logger.info(f"SMTP_USER: {SMTP_USER}")
+    logger.info(f"ADMIN_EMAIL: {ADMIN_EMAIL}")
+
     if not (SMTP_HOST and SMTP_USER and SMTP_PASS):
         logger.info(
             "SMTP not configured - skipping email for booking %s",
@@ -158,7 +165,9 @@ def send_booking_email(b: dict) -> None:
         )
 
         msg["From"] = SMTP_FROM
-        msg["To"] = ADMIN_EMAIL
+
+        # TEMP direct hardcoded test
+        msg["To"] = "info@bagdrop.co"
 
         if b.get("email"):
             msg["Cc"] = b["email"]
@@ -167,6 +176,8 @@ def send_booking_email(b: dict) -> None:
 
         ctx = ssl.create_default_context()
 
+        logger.info("Connecting to SMTP server...")
+
         if SMTP_PORT == 465:
             with smtplib.SMTP_SSL(
                 SMTP_HOST,
@@ -174,17 +185,36 @@ def send_booking_email(b: dict) -> None:
                 context=ctx,
                 timeout=15
             ) as s:
+                logger.info("SMTP SSL connected")
+
                 s.login(SMTP_USER, SMTP_PASS)
+
+                logger.info("SMTP login successful")
+
                 s.send_message(msg)
+
+                logger.info("Email sent successfully")
+
         else:
             with smtplib.SMTP(
                 SMTP_HOST,
                 SMTP_PORT,
                 timeout=15
             ) as s:
+
+                logger.info("SMTP connected")
+
                 s.starttls(context=ctx)
+
+                logger.info("TLS started")
+
                 s.login(SMTP_USER, SMTP_PASS)
+
+                logger.info("SMTP login successful")
+
                 s.send_message(msg)
+
+                logger.info("Email sent successfully")
 
         logger.info(
             "Sent booking email for %s to %s",
@@ -196,8 +226,9 @@ def send_booking_email(b: dict) -> None:
         logger.error(
             "Failed to send booking email for %s: %s",
             b.get("code"),
-            e
+            str(e)
         )
+
 
 # =========================
 # Pydantic Models
