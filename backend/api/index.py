@@ -268,10 +268,41 @@ async def test():
         "working": True
     }
 
+```python id="y7m1q5"
+@api_router.post("/bookings", response_model=Booking)
+async def create_booking(
+    payload: BookingCreate,
+    background: BackgroundTasks
+):
+    try:
+        code = generate_booking_code()
 
+        booking = Booking(
+            **payload.dict(),
+            code=code
+        )
 
-@api_router.post("/bookings", response_model=Booking) async def create_booking( payload: BookingCreate, background: BackgroundTasks ): try: code = generate_booking_code() booking = Booking( **payload.dict(), code=code ) await db.bookings.insert_one( booking.dict() ) # Send email safely try: background.add_task( send_booking_email, booking.dict() ) except Exception as email_error: logger.error(f"EMAIL ERROR: {str(email_error)}") return booking except Exception as e: logger.error(f"BOOKING ERROR: {str(e)}") raise HTTPException( status_code=500, detail=str(e) )
+        await db.bookings.insert_one(
+            booking.dict()
+        )
 
+        # Send email safely
+        try:
+            background.add_task(
+                send_booking_email,
+                booking.dict()
+            )
+        except Exception as email_error:
+            logger.error(f"EMAIL ERROR: {str(email_error)}")
+
+        return booking
+
+    except Exception as e:
+        logger.error(f"BOOKING ERROR: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 @api_router.get("/bookings", response_model=List[Booking])
 async def list_bookings(
