@@ -1,6 +1,6 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Query, BackgroundTasks
 from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
@@ -295,12 +295,6 @@ async def create_booking(
     await db.bookings.insert_one(
         booking.dict()
     )
-
-    background.add_task(
-        send_booking_email,
-        booking.dict()
-    )
-
     return booking
 
 
@@ -421,14 +415,25 @@ async def track(code: str):
     return Booking(**serialize(doc))
 
 # =========================
+# CORS
+# =========================
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://bagdrop-app.vercel.app",
+        "http://localhost:3000",
+    ],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# =========================
 # Register Router
 # =========================
 app.include_router(api_router)
 
-# =========================
-# CORS
-# =========================
-app.add_middleware( CORSMiddleware, allow_origins=[ "https://bagdrop-app.vercel.app", "http://localhost:3000" ], allow_credentials=True, allow_methods=["*"], allow_headers=["*"], )
+
 
 # =========================
 # Logging
