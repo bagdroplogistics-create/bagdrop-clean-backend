@@ -1,17 +1,19 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Query, BackgroundTasks
-from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
+
 import os
 import logging
 import random
 import smtplib
 import ssl
+import uuid
+
 from email.message import EmailMessage
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
-import uuid
 from datetime import datetime, timezone
 
 # =========================
@@ -19,6 +21,30 @@ from datetime import datetime, timezone
 # =========================
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
+
+# =========================
+# FastAPI App
+# =========================
+app = FastAPI(title="Bagdrop Booking API")
+
+# =========================
+# CORS
+# =========================
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://bagdrop-app.vercel.app",
+        "http://localhost:3000",
+    ],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# =========================
+# API Router
+# =========================
+api_router = APIRouter(prefix="/api")
 
 # =========================
 # MongoDB Connection
@@ -32,13 +58,6 @@ db_name = os.environ.get("DB_NAME", "bagdrop")
 
 client = AsyncIOMotorClient(mongo_url)
 db = client[db_name]
-
-# =========================
-# FastAPI App
-# =========================
-app = FastAPI(title="Bagdrop Booking API")
-
-api_router = APIRouter(prefix="/api")
 
 # =========================
 # Helpers
@@ -287,11 +306,8 @@ async def create_booking(
         )
 
         # Send email safely
-        try:
-            background.add_task(
-                send_booking_email,
-                booking.dict()
-            )
+      
+            
         except Exception as email_error:
             logger.error(f"EMAIL ERROR: {str(email_error)}")
 
@@ -461,5 +477,7 @@ async def shutdown_db_client():
 # =========================
 # Vercel ASGI Handler
 # =========================
+
+app.include_router(api_router)
 
 
