@@ -1,9 +1,11 @@
-
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter
 
 app = FastAPI()
 
-@app.get("/")
-async def root():
-    return {"message": "Backend working"}
+api_router = APIRouter(prefix="/api")
 
+@api_router.get("/")
+async def root():
+    return {"message": "Bagdrop API"}
+
+app.include_router(api_router)
