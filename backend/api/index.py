@@ -151,8 +151,9 @@ def _format_booking_email(b: dict) -> str:
         "Selections:",
     ]
 
-   for k, v in (b.get("bag_selections") or {}).items():
+        for k, v in (b.get("bag_selections") or {}).items():
         lines.append(f"  - {k}: {v}")
+     
     lines += ["", f"Created at: {b.get('created_at')}", "", "-- Bagdrop Booking System"]
     return "\n".join(lines)
 
