@@ -1,50 +1,24 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Query, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, APIRouter, HTTPException, Query, BackgroundTasks, Depends
 from dotenv import load_dotenv
+from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-
 import os
 import logging
 import random
 import smtplib
 import ssl
-import uuid
-
 from email.message import EmailMessage
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
-from datetime import datetime, timezone
+import uuid
+from datetime import datetime, timezone, timedelta
 
 # =========================
 # Load Environment Variables
 # =========================
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
-
-# =========================
-# FastAPI App
-# =========================
-app = FastAPI(title="Bagdrop Booking API")
-
-# =========================
-# CORS
-# =========================
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://bagdrop-app.vercel.app",
-        "http://localhost:3000",
-    ],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# =========================
-# API Router
-# =========================
-api_router = APIRouter(prefix="/api")
 
 # =========================
 # MongoDB Connection
@@ -58,6 +32,15 @@ db_name = os.environ.get("DB_NAME", "bagdrop")
 
 client = AsyncIOMotorClient(mongo_url)
 db = client[db_name]
+
+# =========================
+# FastAPI App
+# =========================
+app = FastAPI(title="Bagdrop Booking API")
+
+app.add_middleware( CORSMiddleware, allow_origins=[ "https://bagdrop-app.vercel.app", "http://localhost:3000" ], allow_credentials=True, allow_methods=["*"], allow_headers=["*"], ) 
+
+api_router = APIRouter(prefix="/api")
 
 # =========================
 # Helpers
@@ -78,6 +61,49 @@ STATUS_FLOW = [
     "Delivered",
 ]
 
+# ============== Auth ==============
+OTP_TTL_SECONDS = 5 * 60  # 5 minutes
+
+
+def generate_otp() -> str:
+    """MOCKED OTP: random 6-digit code returned to the client (no SMS sent)."""
+    return f"{random.randint(0, 999999):06d}"
+
+
+def normalize_phone(raw: str) -> str:
+    if not raw:
+        return raw
+    s = "".join(ch for ch in raw if ch.isdigit() or ch == "+")
+    if s.startswith("+"):
+        return s
+    # default to India country code if 10 digits
+    if len(s) == 10:
+        return "+91" + s
+    return s
+
+
+def make_token() -> str:
+    return uuid.uuid4().hex + uuid.uuid4().hex
+
+
+class OtpRequest(BaseModel):
+    phone: str
+
+
+class OtpVerify(BaseModel):
+    phone: str
+    code: str
+    name: Optional[str] = None
+
+
+class User(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    phone: str
+    name: Optional[str] = ""
+    email: Optional[str] = ""
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    
 # =========================
 # Email Configuration
 # =========================
@@ -125,29 +151,20 @@ def _format_booking_email(b: dict) -> str:
         "Selections:",
     ]
 
-    for k, v in (b.get("bag_selections") or {}).items():
+   for k, v in (b.get("bag_selections") or {}).items():
         lines.append(f"  - {k}: {v}")
-
-    lines += [
-        "",
-        f"Created at: {b.get('created_at')}",
-        "",
-        "-- Bagdrop Booking System",
-    ]
-
+    lines += ["", f"Created at: {b.get('created_at')}", "", "-- Bagdrop Booking System"]
     return "\n".join(lines)
 
 # =========================
 # Send Email
 # =========================
-
-# =========================
-# Send Email
-# =========================
 def send_booking_email(b: dict) -> None:
-
     if not (SMTP_HOST and SMTP_USER and SMTP_PASS):
-        logger.info("SMTP not configured")
+        logger.info(
+            "SMTP not configured - skipping email for booking %s",
+            b.get("code")
+        )
         return
 
     try:
@@ -165,266 +182,41 @@ def send_booking_email(b: dict) -> None:
         if b.get("email"):
             msg["Cc"] = b["email"]
 
-        # =========================
-        # HTML EMAIL TEMPLATE
-        # =========================
-        html_content = f"""
-        <html>
-        <head>
-        <style>
-        body {{
-            font-family: Arial, sans-serif;
-            background-color: #f3f3f3;
-            margin: 0;
-            padding: 20px;
-        }}
-
-        .container {{
-            max-width: 700px;
-            margin: auto;
-            background: #ffffff;
-            border-radius: 10px;
-            overflow: hidden;
-            border: 1px solid #e5e5e5;
-        }}
-
-        .header {{
-            background: #ff6b35;
-            color: white;
-            text-align: center;
-            padding: 30px 20px;
-        }}
-
-        .header h1 {{
-            margin: 0;
-            font-size: 34px;
-            letter-spacing: 1px;
-        }}
-
-        .header p {{
-            margin-top: 8px;
-            font-size: 13px;
-            opacity: 0.95;
-        }}
-
-        .content {{
-            padding: 30px;
-        }}
-
-        .title {{
-            color: #ff6b35;
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 10px;
-        }}
-
-        .subtitle {{
-            color: #555;
-            margin-bottom: 25px;
-            line-height: 1.6;
-        }}
-
-        .card {{
-            border: 1px solid #eee;
-            border-left: 4px solid #ff6b35;
-            padding: 20px;
-            margin-bottom: 25px;
-            background: #fafafa;
-        }}
-
-        .card h3 {{
-            margin-top: 0;
-            color: #ff6b35;
-        }}
-
-        .row {{
-            margin-bottom: 12px;
-        }}
-
-        .label {{
-            font-weight: bold;
-            width: 150px;
-            display: inline-block;
-            color: #222;
-        }}
-
-        .value {{
-            color: #444;
-        }}
-
-        .footer {{
-            background: #fafafa;
-            padding: 25px;
-            font-size: 13px;
-            color: #666;
-            text-align: center;
-            border-top: 1px solid #eee;
-        }}
-
-        .badge {{
-            display: inline-block;
-            background: #16a34a;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 13px;
-            margin-top: 15px;
-        }}
-        </style>
-        </head>
-
-        <body>
-
-        <div class="container">
-
-            <div class="header">
-                <h1>BAGDROP</h1>
-                <p>BAG BOX DELIVERED</p>
-
-                <div class="badge">
-                    {b.get('status')}
-                </div>
-            </div>
-
-            <div class="content">
-
-                <div class="title">
-                    Booking Received! ✓
-                </div>
-
-                <div class="subtitle">
-                    Dear {b.get('name')},<br><br>
-
-                    Thank you for choosing Bagdrop. Your booking request has been received successfully.
-                    Our operations team will contact you shortly for confirmation and baggage pickup coordination.
-                </div>
-
-                <div class="card">
-                    <h3>Booking Reference</h3>
-
-                    <div style="font-size:28px;font-weight:bold;color:#222;">
-                        {b.get('code')}
-                    </div>
-                </div>
-
-                <div class="card">
-                    <h3>Delivery Details</h3>
-
-                    <div class="row">
-                        <span class="label">Service Type:</span>
-                        <span class="value">{b.get('service_title')}</span>
-                    </div>
-
-                    <div class="row">
-                        <span class="label">Pickup Location:</span>
-                        <span class="value">{b.get('from_label')}</span>
-                    </div>
-
-                    <div class="row">
-                        <span class="label">Pickup Address:</span>
-                        <span class="value">{b.get('pickup_address')}</span>
-                    </div>
-
-                    <div class="row">
-                        <span class="label">Drop Location:</span>
-                        <span class="value">{b.get('to_label')}</span>
-                    </div>
-
-                    <div class="row">
-                        <span class="label">Drop Address:</span>
-                        <span class="value">{b.get('drop_address')}</span>
-                    </div>
-
-                    <div class="row">
-                        <span class="label">Pickup Date:</span>
-                        <span class="value">{b.get('date')}</span>
-                    </div>
-
-                    <div class="row">
-                        <span class="label">Time Slot:</span>
-                        <span class="value">{b.get('time_slot')}</span>
-                    </div>
-
-                    <div class="row">
-                        <span class="label">Number of Bags:</span>
-                        <span class="value">{b.get('total_bags')}</span>
-                    </div>
-
-                    <div class="row">
-                        <span class="label">Total Price:</span>
-                        <span class="value">₹{b.get('total_price')}</span>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <h3>Customer Information</h3>
-
-                    <div class="row">
-                        <span class="label">Customer Name:</span>
-                        <span class="value">{b.get('name')}</span>
-                    </div>
-
-                    <div class="row">
-                        <span class="label">Phone Number:</span>
-                        <span class="value">{b.get('phone')}</span>
-                    </div>
-
-                    <div class="row">
-                        <span class="label">Email Address:</span>
-                        <span class="value">{b.get('email')}</span>
-                    </div>
-                </div>
-
-            </div>
-
-            <div class="footer">
-                <strong>Need Assistance?</strong><br><br>
-
-                📞 +91 9876543210<br>
-                ✉ info@bagdrop.co<br><br>
-
-                Thank you for choosing Bagdrop.<br>
-                Premium Airport Baggage Delivery Service.
-            </div>
-
-        </div>
-
-        </body>
-        </html>
-        """
-
-        # Plain text fallback
         msg.set_content(_format_booking_email(b))
-
-        # HTML email
-        msg.add_alternative(html_content, subtype="html")
 
         ctx = ssl.create_default_context()
 
-        with smtplib.SMTP(
-            SMTP_HOST,
-            SMTP_PORT,
-            timeout=15
-        ) as s:
-
-            s.starttls(context=ctx)
-
-            s.login(SMTP_USER, SMTP_PASS)
-
-            s.send_message(msg)
+        if SMTP_PORT == 465:
+            with smtplib.SMTP_SSL(
+                SMTP_HOST,
+                SMTP_PORT,
+                context=ctx,
+                timeout=15
+            ) as s:
+                s.login(SMTP_USER, SMTP_PASS)
+                s.send_message(msg)
+        else:
+            with smtplib.SMTP(
+                SMTP_HOST,
+                SMTP_PORT,
+                timeout=15
+            ) as s:
+                s.starttls(context=ctx)
+                s.login(SMTP_USER, SMTP_PASS)
+                s.send_message(msg)
 
         logger.info(
-            "Sent booking email for %s",
-            b.get("code")
+            "Sent booking email for %s to %s",
+            b.get("code"),
+            ADMIN_EMAIL
         )
 
     except Exception as e:
         logger.error(
             "Failed to send booking email for %s: %s",
             b.get("code"),
-            str(e)
+            e
         )
-
 
 # =========================
 # Pydantic Models
@@ -498,21 +290,124 @@ async def find_booking_by_any_id(identifier: str):
         "id": identifier
     })
 
-# =========================
-# Routes
-# =========================
+# ============== Routes ==============
 @api_router.get("/")
 async def root():
-    return {
-        "message": "Bagdrop API",
-        "status": "ok"
-    }
+    return {"message": "Bagdrop API", "status": "ok"}
 
-@api_router.get("/test")
-async def test():
-    return {
-        "working": True
-    }
+
+# ----- Auth -----
+@api_router.post("/auth/request-otp")
+async def request_otp(payload: OtpRequest):
+    phone = normalize_phone(payload.phone)
+    if not phone or len(phone) < 10:
+        raise HTTPException(status_code=400, detail="Invalid phone number")
+    # Store/replace OTP for this phone
+    code = generate_otp()
+    expires_at = (datetime.now(timezone.utc) + timedelta(seconds=OTP_TTL_SECONDS)).isoformat()
+    await db.otps.update_one(
+        {"phone": phone},
+        {"$set": {
+            "phone": phone,
+            "code": code,
+            "expires_at": expires_at,
+            "created_at": now_iso(),
+            "attempts": 0,
+        }},
+        upsert=True,
+    )
+    logger.info("MOCKED OTP for %s -> %s (expires %s)", phone, code, expires_at)
+    # Return mock_otp so the user sees it during dev. In production this would be removed.
+    return {"success": True, "phone": phone, "mock_otp": code, "mocked": True, "ttl": OTP_TTL_SECONDS}
+
+
+@api_router.post("/auth/verify-otp")
+async def verify_otp(payload: OtpVerify):
+    phone = normalize_phone(payload.phone)
+    record = await db.otps.find_one({"phone": phone})
+    if not record:
+        raise HTTPException(status_code=400, detail="No OTP requested for this number")
+    expires_at = datetime.fromisoformat(record["expires_at"])
+    if datetime.now(timezone.utc) > expires_at:
+        raise HTTPException(status_code=400, detail="OTP expired, please request again")
+    if record.get("attempts", 0) >= 5:
+        raise HTTPException(status_code=429, detail="Too many attempts, please request a new OTP")
+    if payload.code.strip() != record["code"]:
+        await db.otps.update_one({"phone": phone}, {"$inc": {"attempts": 1}})
+        raise HTTPException(status_code=400, detail="Incorrect OTP")
+
+    # OTP valid — find or create user
+    existing = await db.users.find_one({"phone": phone})
+    if existing:
+        user_doc = existing
+        if payload.name and not user_doc.get("name"):
+            await db.users.update_one({"id": user_doc["id"]}, {"$set": {"name": payload.name}})
+            user_doc["name"] = payload.name
+    else:
+        user = User(phone=phone, name=payload.name or "")
+        user_doc = user.dict()
+        await db.users.insert_one(user_doc)
+
+    # Issue session token
+    token = make_token()
+    await db.sessions.insert_one({
+        "token": token,
+        "user_id": user_doc["id"],
+        "created_at": now_iso(),
+    })
+    # Consume OTP
+    await db.otps.delete_one({"phone": phone})
+
+    user_doc.pop("_id", None)
+    return {"token": token, "user": user_doc}
+
+
+async def get_current_user(authorization: Optional[str] = None) -> Optional[dict]:
+    # FastAPI will inject from Header() below in the dependency wrapper
+    return None  # placeholder, replaced via dependency
+
+
+from fastapi import Header
+
+
+async def require_user(authorization: Optional[str] = Header(default=None)):
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    token = authorization.split(" ", 1)[1].strip()
+    session = await db.sessions.find_one({"token": token})
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    user = await db.users.find_one({"id": session["user_id"]})
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    user.pop("_id", None)
+    return user
+
+
+@api_router.get("/auth/me")
+async def me(user: dict = Depends(require_user)):
+    return {"user": user}
+
+
+@api_router.post("/auth/logout")
+async def logout(authorization: Optional[str] = Header(default=None)):
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+        await db.sessions.delete_one({"token": token})
+    return {"ok": True}
+
+
+@api_router.patch("/auth/profile")
+async def update_profile(body: dict, user: dict = Depends(require_user)):
+    update = {}
+    for k in ("name", "email"):
+        if k in body and body[k] is not None:
+            update[k] = body[k]
+    if update:
+        await db.users.update_one({"id": user["id"]}, {"$set": update})
+    fresh = await db.users.find_one({"id": user["id"]})
+    fresh.pop("_id", None)
+    return {"user": fresh}
 
 
 @api_router.post("/bookings", response_model=Booking)
@@ -521,6 +416,16 @@ async def create_booking(
     background: BackgroundTasks
 ):
     code = generate_booking_code()
+
+    for _ in range(5):
+        exists = await db.bookings.find_one({
+            "code": code
+        })
+
+        if not exists:
+            break
+
+        code = generate_booking_code()
 
     booking = Booking(
         **payload.dict(),
@@ -531,13 +436,10 @@ async def create_booking(
         booking.dict()
     )
 
-    try:
-        background.add_task(
-            send_booking_email,
-            booking.dict()
-        )
-    except Exception as email_error:
-        logger.error(f"EMAIL ERROR: {str(email_error)}")
+    background.add_task(
+        send_booking_email,
+        booking.dict()
+    )
 
     return booking
 
@@ -659,25 +561,8 @@ async def track(code: str):
     return Booking(**serialize(doc))
 
 # =========================
-# CORS
-# =========================
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://bagdrop-app.vercel.app",
-        "http://localhost:3000",
-    ],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# =========================
 # Register Router
 # =========================
-app.include_router(api_router)
-
-
 
 # =========================
 # Logging
@@ -689,6 +574,8 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+app.include_router(api_router)
+
 # =========================
 # Shutdown Event
 # =========================
@@ -699,7 +586,3 @@ async def shutdown_db_client():
 # =========================
 # Vercel ASGI Handler
 # =========================
-
-app.include_router(api_router)
-
-
